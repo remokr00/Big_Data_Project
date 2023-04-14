@@ -74,7 +74,8 @@ object Gestore {
     Creo il grafo a partire dagli rdd di archi
      */
     val graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
-    graph.edges.take(10).foreach(println)
+
+
 
   }
 
