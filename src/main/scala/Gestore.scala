@@ -3,12 +3,12 @@
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Graph
 import org.apache.spark.sql.SparkSession
-
 import scala.io.Source
 import java.io.{FileOutputStream, PrintWriter}
 import scala.util.Random
 
 object Gestore {
+
   def main(args: Array[String]): Unit = {
 
     //Creo spark Seesion e successivamente lo spark context
@@ -28,21 +28,19 @@ object Gestore {
     val allGroups = sc.textFile(datasetGruppi)
     val top5000 = sc.textFile(datasetTop500)
 
-    //Apro il file dove mettere gli archi del dataset ridotto
+    //---Apro il file dove mettere gli archi del dataset ridotto---
+
     //val filter = new PrintWriter(new FileOutputStream(reducedDataSet,true))
 
     /*
-   Riduco il dataset prendendo solamente i primi 180606713 per ottenere un campione del grafo
-   Non vengono perse informazioni importanti ma, al più, alcune relazioni di amicizia, in quanto il datadet è della forma
+    Riduco il dataset prendendo solamente i primi 180606713 per ottenere un campione del grafo
+    Non vengono perse informazioni importanti ma, al più, alcune relazioni di amicizia, in quanto il datadet è della forma
 
-   #ID1      #ID2
-   101       102
-   101       103
-   ...       ...
+    #ID1      #ID2
+    101       102
+    101       103
+    ...       ...
 
-    */
-
-    /*
     Salvo i primi 180606714 archi nel file reduced che verrà usato poi per effettuare le analisi
 
     var cont = 0
@@ -53,10 +51,11 @@ object Gestore {
       }
     }
     */
+
+
     //trasformo il file col grafo ridotto in RDD
 
     val reducedDataSetRDD = sc.textFile(reducedDataSet)
-
 
     /*
     Uso sc.parallelize perché altrimenti, anziché creare un RDD[STRING] il datasetRidotto
@@ -64,7 +63,7 @@ object Gestore {
      */
 
 
-   //Converto ogni riga del file in una coppia di nodi
+    //Converto ogni riga del file in una coppia di nodi
 
     val edgesRDD = reducedDataSetRDD.map(line => {
       val Array(src, dst) = line.split("\t") //creo un array di coppie from e to
@@ -76,8 +75,6 @@ object Gestore {
      */
     val graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
     graph.edges.take(10).foreach(println)
-
-
 
   }
 
