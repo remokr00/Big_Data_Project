@@ -9,6 +9,8 @@ import scala.util.Random
 
 object Gestore {
 
+  var graph: Graph[_, _] = _ //creo il grafo come variabile globale
+
   def main(args: Array[String]): Unit = {
 
     //Creo spark Seesion e successivamente lo spark context
@@ -55,7 +57,7 @@ object Gestore {
 
     //trasformo il file col grafo ridotto in RDD
 
-    val reducedDataSetRDD = sc.textFile(reducedDataSet)
+    val reducedDataSetRDD = sc.textFile(reducedDataSet).cache()
 
     /*
     Uso sc.parallelize perché altrimenti, anziché creare un RDD[STRING] il datasetRidotto
@@ -73,9 +75,11 @@ object Gestore {
     /*
     Creo il grafo a partire dagli rdd di archi
      */
-    val graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
+     graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
 
+     val most_popular = sc.parallelize(Queries.most_popular(graph)).cache()
 
+     //most_popular.foreach(println)
 
   }
 
