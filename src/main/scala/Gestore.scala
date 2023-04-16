@@ -26,6 +26,15 @@ object Gestore {
     val datasetTop500 = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.top5000.cmty.txt"
     val reducedDataSet = "/Users/remokr00/Desktop/Friendster Project/Dataset/reduced.txt" //file all'interno del quale verrà salvato il dataset ridotto
 
+    /*
+    Path Ilaria
+     */
+
+    //val datasetGruppi = "/Volumes/Extreme SSD/Friendster Project/Dataset/com-friendster.all.cmty.txt"
+    //val datasetAll =  "/Volumes/Extreme SSD/Friendster Project/Dataset/com-friendster.ungraph.txt"
+    //val datasetTop500 =  "/Volumes/Extreme SSD/Friendster Project/Dataset/com-friendster.top5000.cmty.txt"
+    //val reducedDataSet = "/Volumes/Extreme SSD/Friendster Project/Dataset/reduced.txt" //file all'interno del quale verrà salvato il dataset ridotto
+
     //trasformo i file dei gruppi in RDD
     val allGroups = sc.textFile(datasetGruppi)
     val top5000 = sc.textFile(datasetTop500)
@@ -79,7 +88,7 @@ object Gestore {
 
      val most_popular = sc.parallelize(Queries.most_popular(graph)).cache()
 
-     //most_popular.foreach(println)
+     most_popular.foreach(println)
 
   }
 
