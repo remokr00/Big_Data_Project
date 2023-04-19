@@ -1,15 +1,14 @@
 
-
+import Queries.most_popular
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Graph
 import org.apache.spark.sql.SparkSession
+
 import scala.io.Source
 import java.io.{FileOutputStream, PrintWriter}
 import scala.util.Random
 
 object Gestore {
-
-  var graph: Graph[_, _] = _ //creo il grafo come variabile globale
 
   def main(args: Array[String]): Unit = {
 
@@ -21,11 +20,10 @@ object Gestore {
     val sc: SparkContext = spark.sparkContext
 
     //definisco i path dei vari dataset
-    val datasetAll = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.ungraph.txt"
-    val datasetGruppi = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.all.cmty.txt"
-    val datasetTop500 = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.top5000.cmty.txt"
-    val reducedDataSet = "/Users/remokr00/Desktop/Friendster Project/Dataset/reduced.txt" //file all'interno del quale verrà salvato il dataset ridotto
-
+    val datasetGruppi = "/Volumes/Extreme SSD/Friendster Project/Dataset/com-friendster.all.cmty.txt"
+    val datasetAll =  "/Volumes/Extreme SSD/Friendster Project/Dataset/com-friendster.ungraph.txt"
+    val datasetTop500 =  "/Volumes/Extreme SSD/Friendster Project/Dataset/com-friendster.top5000.cmty.txt"
+    val reducedDataSet = "/Users/ilariagallo/eclipse-workspace/Big_Data_Project/reduced.txt"    //file all'interno del quale verrà salvato il dataset ridotto
     /*
     Path Ilaria
      */
@@ -66,7 +64,7 @@ object Gestore {
 
     //trasformo il file col grafo ridotto in RDD
 
-    val reducedDataSetRDD = sc.textFile(reducedDataSet).cache()
+    val reducedDataSetRDD = sc.textFile(reducedDataSet)
 
     /*
     Uso sc.parallelize perché altrimenti, anziché creare un RDD[STRING] il datasetRidotto
@@ -84,11 +82,12 @@ object Gestore {
     /*
     Creo il grafo a partire dagli rdd di archi
      */
-     graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
+    val graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
 
-     val most_popular = sc.parallelize(Queries.most_popular(graph)).cache()
+   // val mostPopular = sc.parallelize(Queries.most_popular(graph)).cache()
+    val friendsList = sc.parallelize(Seq(Queries.friends_list(graph, 101))).cache()
 
-     most_popular.foreach(println)
+
 
   }
 
