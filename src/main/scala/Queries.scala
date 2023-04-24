@@ -28,9 +28,9 @@ object Queries {
     mostPopular
   }
 
-   /*
-   2.  Selezionato un utente, restituire una tupla contenente il numero e la lista dei suoi amici(seguiti)
-    */
+  /*
+  2.  Selezionato un utente, restituire una tupla contenente il numero e la lista dei suoi amici(seguiti)
+   */
   def friends_list(graph: Graph[_,_], id: Long): (Long, List[Int])= {
     val list = graph.outDegrees.filter {case (user, _) => user == id} //filter su archi
     val count  =list.values.sum().toLong
