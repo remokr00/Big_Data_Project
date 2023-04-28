@@ -9,3 +9,6 @@ path in the "Application.scala" file to make sure that the dataset will be uploa
 You can find the 3 files which form the dataset at this link:
 
 https://snap.stanford.edu/data/com-Friendster.html
+
+I suggest to reduce the dataset, in "Gestore" you will find the code that I used to create my own reduced dataset. 
+To create the new DataSet it will take 1 hour (Mac M1 8GB). 
