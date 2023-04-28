@@ -18,8 +18,3 @@ libraryDependencies ++= Seq(
   "com.typesafe" % "config" % "1.4.0",
   "com.fasterxml.jackson.core" % "jackson-databind" % "2.4.0"
 )
-
-
-
-
-

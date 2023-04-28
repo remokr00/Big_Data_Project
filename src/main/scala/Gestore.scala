@@ -1,12 +1,12 @@
 
-
 import org.apache.spark.SparkContext
 import org.apache.spark.graphx.Graph
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, rand, when}
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.{Row, SparkSession}
 
-import java.io.{FileOutputStream, PrintWriter}
-import scala.io.Source
-import scala.util.control.Breaks.break
+import java.io.File
+
 
 object Gestore {
 
@@ -17,7 +17,11 @@ object Gestore {
     //Creo spark Seesion e successivamente lo spark context
     val spark = SparkSession.builder()
       .master("local[*]")
-      .appName("bigdataProject").getOrCreate()
+      .appName("bigdataProject")
+      .config("spark.driver.memory", "8g")
+      .config("spark.executor.memory", "8g")
+      .getOrCreate()
+
 
     val sc: SparkContext = spark.sparkContext
 
@@ -25,8 +29,7 @@ object Gestore {
     val datasetAll = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.ungraph.txt"
     val datasetGruppi = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.all.cmty.txt"
     val datasetTop500 = "/Users/remokr00/Desktop/Friendster Project/Dataset/com-friendster.top5000.cmty.txt"
-    val reducedDataSet = "/Users/remokr00/Desktop/Friendster Project/Dataset/reduced.txt" //file all'interno del quale verrà salvato il dataset ridotto
-    val most_popular = "/Users/remokr00/Desktop/Friendster Project/Dataset/most_popular.txt" //file all'interno del quale verrà salvato il dataset ridotto
+    val reducedDataSet = "/Users/remokr00/Desktop/Friendster Project/Dataset/reduced" //file all'interno del quale verrà salvato il dataset ridotto
 
     /*
     Path Ilaria
@@ -38,159 +41,110 @@ object Gestore {
     //val reducedDataSet = "/Volumes/Extreme SSD/Friendster Project/Dataset/reduced.txt" //file all'interno del quale verrà salvato il dataset ridotto
 
     //trasformo i file dei gruppi in RDD
+
+    val all = sc.textFile(datasetAll).filter(!_.startsWith("#")) //escludo i commenti
+    // val allDF = spark.read.text(datasetAll).filter(row => !row.toString().contains('#'))
+
+    // converte ogni riga in una tupla di due elementi
+    val tuples = all.map(line => {
+      val fields = line.split("\t")
+      (fields(0), fields(1))
+    })
+
+    //creo degli oggetti Row in modo da creare il DF
+    val rowRDD = tuples.map(p => Row(p._1, p._2))
+
+    //Definisco lo schema del DF in modo tale che abbia due colonne Source e Destination
+    val schema = StructType(Seq(
+      StructField("Src", StringType, true),
+      StructField("Dst", StringType, true)
+    ))
+
+    //creo il DF
+    val allDF = spark.createDataFrame(rowRDD, schema)
+
+    //verifico che il DF sia corretto
+    allDF.printSchema()
+    allDF.show(false)
+
     val allGroups = sc.textFile(datasetGruppi)
     val top5000 = sc.textFile(datasetTop500)
 
 
-    /*
-    Riduco il dataset prendendo solamente i primi 180606713 per ottenere un campione del grafo
-    Non vengono perse informazioni importanti ma, al più, alcune relazioni di amicizia, in quanto il datadet è della forma
+    //------------------------------------------------------------ Riduzione con DF
 
-    #ID1      #ID2
-    101       102
-    101       103
-    ...       ...
+    val reducedFolder = new File(reducedDataSet)
 
-    Salvo i primi 180606714 archi nel file reduced che verrà usato poi per effettuare le analisi
+    if (!reducedFolder.exists() || !reducedFolder.isDirectory || reducedFolder.listFiles().length == 0) {
+      // Calcolo del numero di archi per ogni nodo
+      val my_degree = allDF.groupBy("Src").count().withColumnRenamed("count", "degree_count")
 
-    var cont = 0
-    for(line <- Source.fromFile(datasetAll).getLines()){
-      if(! line.contains("#") && cont < 180606714 ){ //la riga non deve contenere commenti e non devo aver raggiunto il limite di archi
-        filter.write(line + "\n")
-        cont += 1
-      }
-    }
-    */
+      // Definizione delle fasce di numero di archi
+      val lessThan1k = my_degree.filter("degree_count < 1000").withColumnRenamed("degree_count", "lessThan1k_degree_count")
+      val between1kAnd5k = my_degree.filter("degree_count >= 1000 AND degree_count <= 5000").withColumnRenamed("degree_count", "between1kAnd5k_degree_count")
+      val greaterThan5k = my_degree.filter("degree_count > 5000").withColumnRenamed("degree_count", "greaterThan5k_degree_count")
 
-    /*
-    Metodo alternativo, sperabilmente più efficiente per ridurre il dataset
-     */
+      // Definizione della percentuale di campionamento per ciascuna fascia di archi
+      val sampleFractionLessThan1k = 0.1
+      val sampleFractionBetween1kAnd5k = 0.05
+      val sampleFractionGreaterThan5k = 0.01
 
-    //per evitare di rifare le stesse operazioni più volte controllo che il file non esista
-    //if(reducedDataSet.isEmpty) {
+      // Creazione del DataFrame di struttura stratificata
+      val strata = allDF.select("Src").distinct()
+        .join(lessThan1k, Seq("Src"), "left_outer")
+        .join(between1kAnd5k, Seq("Src"), "left_outer")
+        .join(greaterThan5k, Seq("Src"), "left_outer")
+        .withColumn("sampleFraction", when(col("lessThan1k_degree_count").isNull, null)
+          .when(col("lessThan1k_degree_count") < 1000, sampleFractionLessThan1k)
+          .when(col("between1kAnd5k_degree_count") >= 1000 && col("between1kAnd5k_degree_count") <= 5000, sampleFractionBetween1kAnd5k)
+          .otherwise(sampleFractionGreaterThan5k))
+        .withColumn("rand", rand())
 
-    val filter = new PrintWriter(new FileOutputStream(reducedDataSet, true))
-    var idCount = Map.empty[String, Int] //mappa che tiene conto di quante volte appare l'ID nel file ridotto per definire poi la penalità
-    val uniqueIDs = collection.mutable.Set[String]()
-    var numEdges = 0
-    for (line <- Source.fromFile(datasetAll).getLines().drop(4)) { //escludo le righe coi commenti con drop
-      val fstElem = line.split("\t")(0)
-      if (!uniqueIDs.contains(fstElem)) { //id non è mai stato inserito
-        uniqueIDs += fstElem //aggiungo l'id
-        filter.write(line + "\n")
-        // Inizializzo il conteggio per l'id corrente a 1
-        idCount += (fstElem -> 1)
-        numEdges+=1
-      }
-      else {
-        val currentCount = idCount(fstElem)
-        // Genero un numero casuale tra 0 e il conteggio corrente elevato a un parametro di scala
-        val rnd = scala.util.Random.nextDouble()
-        val lambda = 1/(1*Math.sqrt(currentCount))
-        // Se il numero casuale è uguale al conteggio corrente, allora sostituisco la riga corrente
-          if (rnd < lambda) {
-            filter.write(line + "\n")
-            // Aggiorno il conteggio per l'id corrente
-            idCount += (fstElem -> (currentCount + 1))
-            numEdges+=1
-          }
-      }
-      if(numEdges > 180606714){
-        break
-      }
+      // Campionamento stratificato del DataFrame originale
+      val sampled = allDF.join(strata, Seq("Src"))
+        .where("rand <= sampleFraction")
+        .select(allDF.columns.map(col): _*)
 
-    }
-    //chiudo il printwriter
-    filter.close()
+      sampled.show()
+      println(sampled.count())
 
-
-
-
-    /*
-
-    var idCount = Map.empty[String, Int] //mappa che tiene conto di quante volte appare l'ID nel file ridotto per definire poi la penalità
-    for (line <- Source.fromFile(datasetAll).getLines().drop(4)) { //escludo le righe coi commenti con drop
-      val fstElem = line.split("\t")(0)
-      if(!idCount.contains(fstElem)){
-        idCount += (fstElem -> 1)
-      }
-      else{
-        idCount += (fstElem -> (idCount(fstElem) + 1))
-      }
-
-    }
-    //val printriter = new PrintWriter(new FileOutputStream(most_popular,true))
-    val orderedIdCount = idCount.toList.sortBy(-_._2).toMap
-    /*
-    var cont = 0
-    for(u <- orderedIdCount){
-      if(cont < 180606714){
-        //voglio aggiungere a most pop la chiave contenuta in orderedIdCOunt
-        printriter.write(u._1+"\n")
-        cont += orderedIdCount(u._1)
-      }
+      //salvo il df su un file di testo
+      sampled.write
+        .option("header", "false")
+        .option("sep", ";")
+        .option("coalesced", "true")
+        .csv(reducedDataSet)
     }
 
-
- */
-
-
-    println(orderedIdCount)
-
-    /*
-    Metodo milo e mario
-     */
-
-
-
-
-  }
-
-
-
-}
-
-/*
-
-    //trasformo il file col grafo ridotto in RDD
-
-    val reducedDataSetRDD = sc.textFile(reducedDataSet).cache()
-
-    /*
-    Uso sc.parallelize perché altrimenti, anziché creare un RDD[STRING] il datasetRidotto
-    risulterebbe un Array[String]
-     */
-
+    //leggo il dataset ridotto
+    val reduced = sc.textFile(reducedDataSet + "/*") //leggo tutti i file
 
     //Converto ogni riga del file in una coppia di nodi
 
-    val edgesRDD = reducedDataSetRDD.map(line => {
-      val Array(src, dst) = line.split("\t") //creo un array di coppie from e to
+    val edgesRDD = reduced.map(line => {
+      val Array(src, dst) = line.split(";") //creo un array di coppie from e to
       (src.toLong, dst.toLong) //converto i numeri in long
     }).cache()
 
+    edgesRDD.take(100).foreach(println)
 
     /*
     Creo il grafo a partire dagli rdd di archi
      */
     graph = Graph.fromEdgeTuples(edgesRDD, defaultValue = 1).cache()
 
-
-
-     //val most_popular = sc.parallelize(Queries.most_popular(graph)).cache()
-     println("Il path è: "+Queries.distance(graph, 101, 181))
-
-
-
- */
-
-
-
-
-
- */
   }
+
+
 }
+
+
+
+
+
+
+
+
 
 
 
