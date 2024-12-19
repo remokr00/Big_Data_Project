@@ -1,6 +1,6 @@
 # Big_Data_Project
 
-This project was developed to pass the Big Data Models and Techniques exam. The task was to perform aggregated 
+This project was developed during the Big Data Models and Techniques exam. The task was to perform aggregated 
 queries on a social network modeled through a graph. The technology used is Apache Spark.
 
 This direcotries contain the backend code of the application. Make sure, if you want to run it, to change the
